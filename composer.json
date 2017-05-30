@@ -1,0 +1,23 @@
+{
+  "name": "atticlab/libface-php",
+  "description": "PHP library to multiply face recognition services",
+  "license": "Apache 2.0",
+  "authors": [
+    {
+      "name": "Attic lab",
+      "email": "inbox@atticlab.net"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Atticlab\\Libface\\": "src"
+    }
+  },
+  "require": {
+    "php": ">=5.4",
+    "ext-gd": "*",
+    "psr/log": "1.0.0",
+    "monolog/monolog": "1.*",
+    "guzzlehttp/guzzle": "^6.2.3"
+  }
+}
