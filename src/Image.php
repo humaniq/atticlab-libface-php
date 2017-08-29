@@ -122,7 +122,7 @@ class Image
                 $resize_height = round(self::OPTIMAL_WIDTH * $ratio);
             }
 
-            $original_image = imagecreatefromstring($binary);
+            $original_image = @imagecreatefromstring($binary);
             $resize_image = imagecreatetruecolor($width, $height);
 
             imagecopyresampled($resize_image, $original_image, 0, 0, 0, 0, $resize_width, $resize_height, $width,

@@ -7,34 +7,41 @@ use Atticlab\Libface\Interfaces\Recognition;
 use Atticlab\Libface\Response;
 use GuzzleHttp\Client as HTTP;
 use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\MultipartStream;
 
 /**
- * Class Kairos
+ * Class FindFace
  * @package App\Lib\Face\Recognition
  */
-class Kairos extends RecognitionBase implements Recognition
+class FindFace extends RecognitionBase implements Recognition
 {
     use \Atticlab\Libface\Traits\Logger;
 
     /**
      * Api id should be unique
      */
-    const ID = 2;
+    const ID = 4;
     const TIMEOUT = 30;
+
     /**
-     * Kairos constructor.
-     * @param \Atticlab\Libface\Configs\Kairos $config
+     * MIN accepted similarity from [0 to 1]
+     */
+    const MIN_SIMILARITY = 0.93;
+
+    /**
+     * FindFace constructor.
+     * @param \Atticlab\Libface\Configs\FindFace $config
      * @param \Psr\Log\LoggerInterface|null    $logger
      * @throws \Atticlab\Libface\Exception
      */
-    public function __construct(\Atticlab\Libface\Configs\Kairos $config, \Psr\Log\LoggerInterface $logger = null)
+    public function __construct(\Atticlab\Libface\Configs\FindFace $config, \Psr\Log\LoggerInterface $logger = null)
     {
         if ($logger instanceof \Psr\Log\LoggerInterface) {
             $this->setLogger($logger);
         }
 
         $this->ldebug('Enabling service',
-            [$this->getServiceName(), $config->application_id, $config->application_key, $config->gallery_name]);
+            [$this->getServiceName(), $config->token, $config->gallery_name]);
 
         try {
             $config->validate();
@@ -65,7 +72,7 @@ class Kairos extends RecognitionBase implements Recognition
             throw new Exception(Exception::INVALID_CONFIG);
         }
 
-        $http = new HTTP();
+        $http = new HTTP(['http_errors' => false]);
 
         try {
             $response = $http->send($request, ['timeout' => self::TIMEOUT]);
@@ -91,7 +98,7 @@ class Kairos extends RecognitionBase implements Recognition
             throw new Exception(Exception::INVALID_CONFIG);
         }
 
-        $http = new HTTP();
+        $http = new HTTP(['http_errors' => false]);
 
         try {
             $response = $http->send($request, ['timeout' => self::TIMEOUT]);
@@ -115,7 +122,7 @@ class Kairos extends RecognitionBase implements Recognition
                 throw new Exception(Exception::INVALID_CONFIG);
             }
 
-            $http = new HTTP();
+            $http = new HTTP(['http_errors' => false]);
 
             try {
                 $response = $http->send($request, ['timeout' => self::TIMEOUT]);
@@ -140,15 +147,15 @@ class Kairos extends RecognitionBase implements Recognition
      */
     public function checkServiceAvailability()
     {
-        $request = new Request('GET', \Atticlab\Libface\Configs\Kairos::STATUS_URL, []);
+        $request = new Request('GET', \Atticlab\Libface\Configs\FindFace::STATUS_URL, []);
 
         $is_available = false;
 
         try {
             $http = new HTTP(['http_errors' => false]);
             $response = $http->send($request);
-            //api must return 403 code for not auth requests
-            $is_available = $response->getStatusCode() == 403;
+            //api must return 401 code for not auth requests
+            $is_available = $response->getStatusCode() == 401;
         } catch (\Exception $e) {
             $this->lerror('Error while try to check service availability status', [
                 'service' => $this->getServiceName(),
@@ -170,23 +177,37 @@ class Kairos extends RecognitionBase implements Recognition
      */
     public function prepareRecognitionRequest($image_base64)
     {
-        $url = rtrim(\Atticlab\Libface\Configs\Kairos::HOST_NAME, '/') . '/recognize';
+        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/faces/gallery/' . $this->config->gallery_name . '/identify/';
 
-        $headers = [
-            'Content-Type' => 'application/json',
-            'app_id'       => $this->config->application_id,
-            'app_key'      => $this->config->application_key
-        ];
+        // try to decode image into binary
+        $binary = @base64_decode($image_base64);
+        if (empty($binary)) {
+            $this->lerror('Empty image data after decoding');
+            throw new Exception(Exception::EMPTY_IMAGE_DATA);
+        }
 
-        $body = json_encode([
-            "image"        => $image_base64,
-            "gallery_name" => $this->config->gallery_name,
+        $image = imagecreatefromstring($binary);
+
+        $path = tempnam(sys_get_temp_dir(), 'tmp');
+        imagejpeg($image, $path);
+
+        $multipart = new MultipartStream([
+            [
+                'name' => 'photo',
+                'contents' => fopen($path, 'r')
+            ],
         ]);
 
-        return new Request('POST', $url, $headers, $body);
+        unlink($path);
+
+        $headers = [
+            'Content-Type'  => 'multipart/form-data; boundary=' . $multipart->getBoundary(),
+            'Authorization' => 'Token ' . $this->config->token
+        ];
+
+        return new Request('POST', $url, $headers, $multipart);
     }
 
-    // @TODO: Where is link for documentation?
     /**
      * Handle response of service.
      * @param \GuzzleHttp\Psr7\Response $response
@@ -209,23 +230,26 @@ class Kairos extends RecognitionBase implements Recognition
             throw new Exception(Exception::BAD_SERVICE_RESPONSE);
         }
 
-        //will throw Exception or nothing
-        $this->checkResponseErrors($data);
+        if ($response->getStatusCode() != 200) {
+            $this->checkResponseErrors($data);
+        }
 
         //check existing of face id
         $existed_face_id = null;
 
-        if (empty($data['images'])) {
-            $this->lerror('Unexpected empty images response from Kairos', [$data]);
+        if (empty($data['results'])) {
+            $this->lerror('Unexpected response from FindFace [data->results]', [$data]);
             throw new Exception(Exception::BAD_SERVICE_RESPONSE);
         }
 
-        if (sizeof($data['images']) > 1) {
+        if (sizeof($data['results']) > 1) {
             throw new Exception(Exception::MANY_FACES_FOUND);
         }
 
-        if (!empty($data['images'][0]["transaction"]['subject_id'])) {
-            $existed_face_id = $data['images'][0]["transaction"]['subject_id'];
+        $data['results'] = array_values($data['results']);
+
+        if (!empty($data['results'][0][0]['confidence']) && $data['results'][0][0]['confidence'] >= self::MIN_SIMILARITY) {
+            $existed_face_id = $data['results'][0][0]['face']['id'];
         }
 
         return $existed_face_id;
@@ -235,33 +259,39 @@ class Kairos extends RecognitionBase implements Recognition
      * Build params for guzzle request on create new face id
      * @param $image_base64 string
      * @return \GuzzleHttp\Psr7\Request
-     * @see https://www.kairos.com/docs/api/#post-enroll
+     * @see https://www.FindFace.com/docs/api/#post-enroll
      */
     public function prepareCreateRequest($image_base64)
     {
-        //generate new face id
-        $face_id = sha1(microtime() . uniqid(__CLASS__, true));
+        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/face/?galleries=' . $this->config->gallery_name;
 
-        $url = rtrim(\Atticlab\Libface\Configs\Kairos::HOST_NAME, '/') . '/enroll';
+        // try to decode image into binary
+        $binary = @base64_decode($image_base64);
+        if (empty($binary)) {
+            $this->lerror('Empty image data after decoding');
+            throw new Exception(Exception::EMPTY_IMAGE_DATA);
+        }
 
-        $request_params = [
-            "image"        => $image_base64,
-            "gallery_name" => $this->config->gallery_name,
-            "subject_id"   => $face_id,
-        ];
+        $image = imagecreatefromstring($binary);
 
-        $request = json_encode($request_params);
+        $path = tempnam(sys_get_temp_dir(), 'tmp');
+        imagejpeg($image, $path);
+
+        $multipart = new MultipartStream([
+            [
+                'name' => 'photo',
+                'contents' => fopen($path, 'r')
+            ],
+        ]);
+
+        unlink($path);
 
         $headers = [
-            'Content-Type'   => 'application/json',
-            'Content-Length' => strlen($request),
-            'app_id'         => $this->config->application_id,
-            'app_key'        => $this->config->application_key
+            'Content-Type'  => 'multipart/form-data; boundary=' . $multipart->getBoundary(),
+            'Authorization' => 'Token ' . $this->config->token
         ];
 
-        $body = $request;
-
-        return new Request('POST', $url, $headers, $body);
+        return new Request('POST', $url, $headers, $multipart);
     }
 
     /**
@@ -286,24 +316,31 @@ class Kairos extends RecognitionBase implements Recognition
             throw new Exception(Exception::BAD_SERVICE_RESPONSE);
         }
 
-        //will throw Exception or nothing
-        $this->checkResponseErrors($data);
+        if ($response->getStatusCode() != 200) {
+            //will throw Exception or nothing
+            $this->checkResponseErrors($data);
+        }
 
         //check existing of face id
         $created_face_id = null;
 
-        if (empty($data['images'])) {
-            $this->lerror('Unexpected empty images response from Kairos', [$data]);
+        if (empty($data['results'])) {
+            $this->lerror('Unexpected response from FindFace [data->results]', [$data]);
             throw new Exception(Exception::BAD_SERVICE_RESPONSE);
         }
 
-        if (sizeof($data['images']) > 1) {
+        if (sizeof($data['results']) > 1) {
             throw new Exception(Exception::MANY_FACES_FOUND);
         }
 
-        if (!empty($data['images'][0]["transaction"]['subject_id'])) {
-            $created_face_id = $data['images'][0]["transaction"]['subject_id'];
+        $data['results'] = array_values($data['results']);
+
+        if (empty($data['results'][0]['id'])) {
+            $this->lerror('Unexpected response from FindFace [data->results[0]]', [$data]);
+            throw new Exception(Exception::BAD_SERVICE_RESPONSE);
         }
+
+        $created_face_id = $data['results'][0]['id'];
 
         return $created_face_id;
     }
@@ -314,44 +351,52 @@ class Kairos extends RecognitionBase implements Recognition
      */
     private function checkResponseErrors(array $data) {
         //check errors
-        if (isset($data["Errors"][0]['ErrCode'])) {
-            switch ($data["Errors"][0]['ErrCode']) {
-                case 3003:
+        if (isset($data["code"])) {
+            switch ($data["code"]) {
+                case "AUTH_FAILED":
                     ###########################################
                     # Invalid authentication parameters
                     # The app_id or app_key were not valid.
-                    $this->lerror('Error in Kairos response. Invalid app key or app id for Kairos', [$data]);
+                    $this->lerror('Error in FindFace response. Invalid token for FindFace', [$data]);
                     throw new Exception(Exception::INVALID_CONFIG);
                     break;
-                case 5000:
+                case "BAD_IMAGE":
                     ###########################################
                     # An invalid image was sent must be jpg or png format
                     # We only accept images in JPG and PNG format currently.
-                    $this->lerror('Error in Kairos response. Unsupported type of image', [$data]);
+                    $this->lerror('Error in FindFace response. Unsupported type of image', [$data]);
                     throw new Exception(Exception::INVALID_IMAGE);
                     break;
-                case 5002:
+                case "NO_FACES":
                     ###########################################
                     # If the picture does not have Faces return Error
-                    $this->lerror('Error in Kairos response. No faces was found', [$data]);
+                    $this->lerror('Error in FindFace response. No faces was found', [$data]);
                     throw new Exception(Exception::NO_FACES_FOUND);
                     break;
-                case 5004:
-                    ###########################################
-                    # If gallery not found return Error
-                    $this->lerror('Error in Kairos response. Gallery was not found', [$data]);
-                    throw new Exception(Exception::INVALID_CONFIG);
-                    break;
-                case 5010:
-                    ###########################################
-                    # If the picture hav many faces return Error
-                    $this->lerror('Error in Kairos response. Many faces was found', [$data]);
-                    throw new Exception(Exception::MANY_FACES_FOUND);
-                    break;
+                case "BAD_PARAM":
+                    if (isset($data["code"])) {
+                        switch ($data["code"]) {
+                            case "galleries":
+                                ###########################################
+                                # Invalid authentication parameters
+                                # The app_id or app_key were not valid.
+                                $this->lerror('Error in FindFace response. Invalid gallery for FindFace', [$data]);
+                                throw new Exception(Exception::INVALID_CONFIG);
+                                break;
+                            case "photo":
+                                ###########################################
+                                # Invalid authentication parameters
+                                # The app_id or app_key were not valid.
+                                $this->lerror('Error in FindFace response. Invalid photo for FindFace', [$data]);
+                                throw new Exception(Exception::INVALID_IMAGE);
+                                break;
+                        }
+                    }
                 default:
-                    $this->lerror('Unexpected error response from Kairos', [$data]);
-                    throw new Exception(Exception::BAD_SERVICE_RESPONSE);
             }
         }
+
+        $this->lerror('Unexpected error response from FindFace', [$data]);
+        throw new Exception(Exception::BAD_SERVICE_RESPONSE);
     }
 }

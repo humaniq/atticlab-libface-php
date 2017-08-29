@@ -15,6 +15,16 @@ class Recognition
     private $kairos;
 
     /**
+     * @var \Atticlab\Libface\Recognition\VisionLabs
+     */
+    private $vision_labs;
+
+    /**
+     * @var \Atticlab\Libface\Recognition\FindFace
+     */
+    private $find_face;
+
+    /**
      * @var \Atticlab\Libface\Interfaces\Recognition[]
      */
     private $services = [];
@@ -38,16 +48,54 @@ class Recognition
      * @param string $application_key
      * @param string $gallery_name
      */
-    public function enableKairos($application_id, $application_key, $gallery_name)
+    public function enableKairos($application_id, $application_key, $gallery_name, $limit)
     {
         $config = new \Atticlab\Libface\Configs\Kairos();
         $config->application_id = $application_id;
         $config->application_key = $application_key;
         $config->gallery_name = $gallery_name;
+        $config->limit = $limit;
 
         $this->kairos = new \Atticlab\Libface\Recognition\Kairos($config, $this->_logger);
         $service_id = $this->kairos->getServiceID();
         $this->services[$service_id] = &$this->kairos;
+    }
+
+    /**
+     * Enable and configure VisionLabs API
+     * @param string $token
+     * @param string $descriptor_lists
+     * @param string $person_lists
+     */
+    public function enableVisionLabs($token, $descriptor_lists, $person_lists, $limit)
+    {
+        $config = new \Atticlab\Libface\Configs\VisionLabs();
+        $config->token = $token;
+        $config->descriptor_lists = $descriptor_lists;
+        $config->person_lists = $person_lists;
+        $config->limit = $limit;
+
+        $this->vision_labs = new \Atticlab\Libface\Recognition\VisionLabs($config, $this->_logger);
+        $service_id = $this->vision_labs->getServiceID();
+        $this->services[$service_id] = &$this->vision_labs;
+    }
+
+    /**
+     * Enable and configure FindFace API
+     * @param string $token
+     * @param string $gallery_name
+     * @param string $person_lists
+     */
+    public function enableFindFace($token, $gallery_name, $limit)
+    {
+        $config = new \Atticlab\Libface\Configs\FindFace();
+        $config->token = $token;
+        $config->gallery_name = $gallery_name;
+        $config->limit = $limit;
+
+        $this->find_face = new \Atticlab\Libface\Recognition\FindFace($config, $this->_logger);
+        $service_id = $this->find_face->getServiceID();
+        $this->services[$service_id] = &$this->find_face;
     }
 
 //  //ADVANCED VERSION OF REALISATION
@@ -237,5 +285,53 @@ class Recognition
         }
 
         return $results;
+    }
+
+    /**
+     * Return ids of enabled services
+     * @return array
+     */
+    public function getServicesIDs()
+    {
+        $ids = [];
+        foreach ($this->services as $id => $service) {
+            $ids[] = $id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Return services
+     * @return array
+     */
+    public function getServices()
+    {
+        return $this->services;
+    }
+
+    public function getServiceLimitById($service_id) {
+        return $this->services[$service_id]->getLimit();
+    }
+
+    public function getServiceNameById($service_id) {
+        return $this->services[$service_id]->getServiceName();
+    }
+
+    /**
+     * @param integer $service_id
+     * @return null
+     */
+    public function removeServiceById($service_id)
+    {
+        $this->ldebug('Remove service by id');
+        $service_id = intval($service_id);
+
+        if (empty($this->services[$service_id])) {
+            $this->lnotice('Trying to remove not existed service with id ' . $service_id);
+            return;
+        }
+
+        unset($this->services[$service_id]);
     }
 }

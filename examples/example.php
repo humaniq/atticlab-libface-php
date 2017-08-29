@@ -15,6 +15,8 @@ $logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
 try {
     $recognition = new \Atticlab\Libface\Recognition($logger);
     $recognition->enableKairos('8053a393', 'f0385fae65661043c9ac66d1df3b2804', 'users');
+//    $recognition->enableVisionLabs('52d844c1-61e5-43ca-b61b-755121542c5d', '764235a0-a5ea-4a62-98b9-0ee3958678c4', '51b9dbcb-66a6-4170-9c1d-abbe23146ec6');
+    $recognition->enableFindFace('THFVMGDT00ccRWPAw2iQqdakSanHPqA9', 'faces');
 } catch (\Atticlab\Libface\Exception $e) {
     $code = $e->getCode();
     $message = $e->getMessage();
@@ -38,7 +40,12 @@ $img_many_faces = file_get_contents('./images/many_faces.txt');
 $img_null = null;
 
 try {
-    $result = $recognition->checkServicesAvailability(); // Test valid image
+
+    ####################################################
+    # KAIROS                                           #
+    ####################################################
+
+    $result = $recognition->checkServicesAvailability();
     var_dump($result);
 
 //    $result = $recognition->recognize(\Atticlab\Libface\Recognition\Kairos::ID, $img_null); // no image
@@ -59,11 +66,69 @@ try {
 //    $result = $recognition->create($img_no_face);
 //    var_dump($result);
 
-    $result = $recognition->recognize(\Atticlab\Libface\Recognition\Kairos::ID, $img_valid); // valid image
-    var_dump($result);
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\Kairos::ID, $img_valid); // valid image
+//    var_dump($result);
 
-    $result = $recognition->create($img_valid);
-    var_dump($result);
+//    $result = $recognition->create($img_valid);
+//    var_dump($result);
+
+
+    ####################################################
+    # VISIONLABS                                       #
+    ####################################################
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\VisionLabs::ID, $img_null); // no image
+//    var_dump($result);
+
+//    $result = $recognition->create($img_null);
+//    var_dump($result);
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\VisionLabs::ID, $img_many_faces); // many faces
+//    var_dump($result);
+
+//    $result = $recognition->create($img_many_faces);
+//    var_dump($result);
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\VisionLabs::ID, $img_no_face); // no faces
+//    var_dump($result);
+
+//    $result = $recognition->create($img_no_face);
+//    var_dump($result);
+
+//     $result = $recognition->create($img_valid); // valid image
+//    var_dump($result);
+//
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\VisionLabs::ID, $img_valid);
+//   var_dump($result);
+
+
+    ####################################################
+    # FindFace                                         #
+    ####################################################
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\FindFace::ID, $img_null); // no image
+//    var_dump($result);
+
+//    $result = $recognition->create($img_null);
+//    var_dump($result);
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\FindFace::ID, $img_many_faces); // many faces
+//    var_dump($result);
+
+//    $result = $recognition->create($img_many_faces);
+//    var_dump($result);
+
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\FindFace::ID, $img_no_face); // no faces
+//    var_dump($result);
+
+//    $result = $recognition->create($img_no_face);
+//    var_dump($result);
+
+//     $result = $recognition->create($img_valid); // valid image
+//     var_dump($result);
+//
+//    $result = $recognition->recognize(\Atticlab\Libface\Recognition\FindFace::ID, $img_valid);
+//    var_dump($result);
 
 } catch (\Atticlab\Libface\Exception $e) {
     $code = $e->getCode();

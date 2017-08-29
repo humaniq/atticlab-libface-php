@@ -3,7 +3,7 @@ namespace Atticlab\Libface\Configs;
 
 use Atticlab\Libface\Interfaces\Config;
 
-class Kairos implements Config
+class Kairos extends BaseConfig implements Config
 {
     /**
      * Kairos Api url
@@ -42,6 +42,7 @@ class Kairos implements Config
      */
     public function validate()
     {
+        parent::validate();
         $this->application_id = trim(strtolower($this->application_id));
         $length = strlen($this->application_id);
         if ($length != 8) {
