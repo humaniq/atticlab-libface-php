@@ -26,7 +26,7 @@ class FindFace extends RecognitionBase implements Recognition
     /**
      * MIN accepted similarity from [0 to 1]
      */
-    const MIN_SIMILARITY = 0.93;
+    const MIN_SIMILARITY = 0.8;
 
     /**
      * FindFace constructor.
