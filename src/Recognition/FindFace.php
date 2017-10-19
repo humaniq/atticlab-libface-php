@@ -115,7 +115,7 @@ class FindFace extends RecognitionBase implements Recognition
 
         if (empty($face_id)) {
             //create if not exist
-            $request = $this->prepareCreateRequest($image_base64);
+            $request = $this->prepareCreateRequest($image_base64,$gallery);
 
             if (!($request instanceof \GuzzleHttp\Psr7\Request)) {
                 $this->lerror('Trying to execute invalid request object');
@@ -180,6 +180,7 @@ class FindFace extends RecognitionBase implements Recognition
         if (empty($gallery)) {
             $gallery = $this->config->gallery_name;
         }
+        $this->ensureGalleryExists($gallery);
         $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/faces/gallery/' . $gallery . '/identify/';
 
         // try to decode image into binary
@@ -264,9 +265,14 @@ class FindFace extends RecognitionBase implements Recognition
      * @return \GuzzleHttp\Psr7\Request
      * @see https://www.FindFace.com/docs/api/#post-enroll
      */
-    public function prepareCreateRequest($image_base64)
+    public function prepareCreateRequest($image_base64, $gallery = null)
     {
-        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/face/?galleries=' . $this->config->gallery_name;
+        if (empty($gallery)) {
+            $gallery = $this->config->gallery_name;
+        }
+        $this->ensureGalleryExists($gallery);
+
+        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/face/?galleries=' . $gallery;
 
         // try to decode image into binary
         $binary = @base64_decode($image_base64);
@@ -401,5 +407,36 @@ class FindFace extends RecognitionBase implements Recognition
 
         $this->lerror('Unexpected error response from FindFace', [$data]);
         throw new Exception(Exception::BAD_SERVICE_RESPONSE);
+    }
+
+    public function ensureGalleryExists($gallery) {
+        if (empty($gallery)) {
+            return;
+        }
+        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/galleries/' . $gallery;
+        $headers = [
+            'Authorization' => 'Token ' . $this->config->token
+        ];
+
+        $request = new Request('POST', $url, $headers);
+
+        if (!($request instanceof \GuzzleHttp\Psr7\Request)) {
+            $this->lerror('Trying to execute invalid request object');
+            throw new Exception(Exception::INVALID_CONFIG);
+        }
+
+        $http = new HTTP(['http_errors' => false]);
+
+        try {
+            $response = $http->send($request, ['timeout' => self::TIMEOUT]);
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $this->lerror('Failed to executeHttpRequest request', ['message' => $e->getMessage()]);
+            throw new Exception(Exception::TRANSPORT_ERROR);
+        } catch (\Exception $e) {
+            $this->lemergency('Unexpected exception',
+                [get_class($e), $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()]);
+            throw new Exception(Exception::TRANSPORT_ERROR);
+        }
+
     }
 }
