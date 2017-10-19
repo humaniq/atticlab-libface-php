@@ -63,9 +63,9 @@ class FindFace extends RecognitionBase implements Recognition
         return self::ID;
     }
 
-    public function getFaceID($image_base64)
+    public function getFaceID($image_base64, $gallery = null)
     {
-        $request = $this->prepareRecognitionRequest($image_base64);
+        $request = $this->prepareRecognitionRequest($image_base64, $gallery);
 
         if (!($request instanceof \GuzzleHttp\Psr7\Request)) {
             $this->lerror('Trying to execute invalid request object');
@@ -88,10 +88,10 @@ class FindFace extends RecognitionBase implements Recognition
         return $this->processRecognitionHttpResponse($response);
     }
 
-    public function createFaceID($image_base64)
+    public function createFaceID($image_base64, $gallery = null)
     {
         //check existing face id at first
-        $request = $this->prepareRecognitionRequest($image_base64);
+        $request = $this->prepareRecognitionRequest($image_base64,$gallery);
 
         if (!($request instanceof \GuzzleHttp\Psr7\Request)) {
             $this->lerror('Trying to execute invalid request object');
@@ -175,9 +175,12 @@ class FindFace extends RecognitionBase implements Recognition
      * @param $image_base64 string
      * @return \GuzzleHttp\Psr7\Request
      */
-    public function prepareRecognitionRequest($image_base64)
+    public function prepareRecognitionRequest($image_base64, $gallery = null)
     {
-        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/faces/gallery/' . $this->config->gallery_name . '/identify/';
+        if (empty($gallery)) {
+            $gallery = $this->config->gallery_name;
+        }
+        $url = rtrim(\Atticlab\Libface\Configs\FindFace::HOST_NAME, '/') . '/faces/gallery/' . $gallery . '/identify/';
 
         // try to decode image into binary
         $binary = @base64_decode($image_base64);

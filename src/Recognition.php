@@ -158,7 +158,7 @@ class Recognition
      * @return \Atticlab\Libface\Response
      * @throws \Atticlab\Libface\Exception
      */
-    public function recognize($service_id, $img_base64)
+    public function recognize($service_id, $img_base64, $gallery = null)
     {
         $this->ldebug('Start recognizing face id');
         $service_id = intval($service_id);
@@ -173,7 +173,7 @@ class Recognition
         // Recognize image
         $service = $this->services[$service_id];
         $this->ldebug('Recognizing', ['service' => $service->getServiceName()]);
-        $face_id = $service->getFaceID($img->getImage());
+        $face_id = $service->getFaceID($img->getImage(), $gallery);
 
         return new Response($service_id, $face_id);
     }
