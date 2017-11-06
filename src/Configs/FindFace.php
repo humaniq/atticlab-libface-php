@@ -8,7 +8,7 @@ class FindFace extends BaseConfig implements Config
     /**
      * Lambdal Api url
      */
-    const HOST_NAME = "https://api.findface.pro/v1";
+    const HOST_NAME = "http://5.9.158.208:8000/v1";
 
     /**
      * Used for check service availability
@@ -36,10 +36,10 @@ class FindFace extends BaseConfig implements Config
         parent::validate();
         $this->token = trim($this->token);
 
-        $length = strlen($this->token);
-        if ($length != 32) {
-            throw new \InvalidArgumentException('Invalid mashape key [' . $this->token . ']');
-        }
+        //$length = strlen($this->token);
+        //if ($length != 32) {
+        //    throw new \InvalidArgumentException('Invalid mashape key [' . $this->token . ']');
+        //}
 
         $this->gallery_name = trim($this->gallery_name);
         if (empty($this->gallery_name)) {
